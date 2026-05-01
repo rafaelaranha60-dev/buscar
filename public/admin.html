@@ -715,7 +715,7 @@
 
                             <div class="entry-meta">
                                 <span class="meta-tag">${entry.ip || 'N/A'}</span>
-                                <button class="btn-delete" onclick="deleteEntry(${realIndex})" title="Apagar">
+                                <button class="btn-delete" onclick="deleteEntry('${entry.id}')" title="Apagar">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="18" y1="6" x2="6" y2="18"/>
                                         <line x1="6" y1="6" x2="18" y2="18"/>
@@ -740,13 +740,13 @@
         }
 
         // Delete single entry
-        async function deleteEntry(index) {
+        async function deleteEntry(docId) {
             showConfirm('Apagar Registro', 'Tem certeza que deseja apagar este registro?', async () => {
                 try {
                     const res = await fetch('/api/admin/delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: adminEmail, password: adminPassword, index })
+                        body: JSON.stringify({ email: adminEmail, password: adminPassword, docId })
                     });
                     const data = await res.json();
                     if (data.success) {
